@@ -1,6 +1,6 @@
 import requests
-from json import JSONDecoder
-import prometheus_client
+from prometheus_client import start_http_server, Gauge
+import random
 import time
 import xml.etree.ElementTree as ET
 
@@ -18,6 +18,14 @@ def extract_values_by_key(data, key):
             values.extend(extract_values_by_key(item, key))
 
     return values
+
+def get_all_keys(xml_tree):
+    all_keys = set()
+
+    for element in xml_tree.iter():
+        all_keys.add(element.tag)
+
+    return all_keys
 
 def get_value_from_xml(xml_file, key):
     tree = ET.parse(xml_file)
@@ -41,7 +49,13 @@ def send_curl_start_request():
     print("sending start request to: " + url)
     return (extract_values_by_key(response.json(),'session'))
 
-
+def load_response_text_to_xml(response_text):
+    try:
+        root = ET.fromstring(response_text)
+        return ET.ElementTree(root)
+    except ET.ParseError as e:
+        print(f"Error parsing XML: {e}")
+        return None
 def get_curl_report_request(sessions):
 
     for session in sessions:
@@ -52,12 +66,27 @@ def get_curl_report_request(sessions):
             'ITB_API_KEY': '4ADF04C1X2ABFX4B08XA89DXABF8D577AE06'
         }
         response = requests.request("GET", url, headers=headers, data=payload)
-        while get_value_from_xml(response.text,session) != 'FAILURE':
+        while response.status_code == 404:
             response = requests.request("GET", url, headers=headers, data=payload)
-        print(response.text)
+        while ET.fromstring(response.text).find(
+                '{http://www.gitb.com/tr/v1/}result').text == "UNDEFINED":
+            response = requests.request("GET", url, headers=headers, data=payload)
+        return ET.fromstring(response.text).find(
+                '{http://www.gitb.com/tr/v1/}result').text
 
+example_metric = Gauge('example_metric', 'Description of example metric')
+# Function to update the metric value
+def update_metric():
+    while True:
+        # Simulate updating a metric value (replace this with your actual metric logic)
+        metric_value = random.randint(1, 100)
+        example_metric.set(metric_value)
 
-
+        # Sleep for a short duration (e.g., 5 seconds)
+        time.sleep(5)
+        
 if __name__ == '__main__':
+    start_http_server(8000)
     sessions = send_curl_start_request()
     get_curl_report_request(sessions)
+    update_metric()
