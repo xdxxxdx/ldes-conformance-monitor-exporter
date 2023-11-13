@@ -1,44 +1,10 @@
 import requests
 from prometheus_client import start_http_server, Gauge,Info
-import time
+import json
 import xml.etree.ElementTree as ET
 import os
 import logging
 from dotenv import load_dotenv
-
-
-
-#XML PROCESSING
-#funciion to load xml response to xml tree
-def load_response_text_to_xml(response_text):
-    try:
-        root = ET.fromstring(response_text)
-        return ET.ElementTree(root)
-    except ET.ParseError as e:
-        logging.info(f"Error parsing XML: {e}")
-        return None
-
-#function to get all keys from xml tree
-def get_all_keys(xml_tree):
-    all_keys = set()
-
-    for element in xml_tree.iter():
-        all_keys.add(element.tag)
-
-    return all_keys
-
-#function to get all values from xml tree
-def get_value_from_xml(xml_file, key):
-    tree = ET.parse(xml_file)
-    root = tree.getroot()
-
-    # Find the key in the XML file
-    for element in root.iter(key):
-        return element.text
-
-    # If the key is not found, return None or raise an exception, depending on your requirements
-    return None
-
 
 # function to extract values from nested JSON dict
 def extract_values_by_key(data, key):
@@ -57,6 +23,15 @@ def extract_values_by_key(data, key):
     return values
 
 
+def calculate_percentage_not_equal(dictionary, target_value):
+    # Count the number of values not equal to the target value
+    not_equal_count = sum(1 for value in dictionary.values() if value != target_value)
+
+    # Calculate the percentage
+    total_items = len(dictionary)
+    percentage_not_equal = (not_equal_count / total_items) * 100
+
+    return percentage_not_equal
 
 
 #Interaction with ITB
@@ -100,6 +75,7 @@ def get_curl_report_request(sessions,itb_api_key,report_api_endpoint):
 
 if __name__ == '__main__':
     start_http_server(8000)
+
     #load configurable parameters
     load_dotenv()
     start_api_endpoint = os.getenv("START_API_ENDPOINT")
@@ -109,12 +85,10 @@ if __name__ == '__main__':
     report_api_endpoint = os.getenv("REPORT_API_ENDPOINT")
     logging.basicConfig(level=debug_level)
 
-    #todo: Define how to reflect results to Prometheuse.
-    #todo: Which testcases we are looking for from the ITB?
-    info_1 = Info('test_results_info_1', 'The results of test')
+    test_result = Info('test_results_info_1', 'The results of test')
     while True:
          sessions = send_curl_start_request(start_api_endpoint,start_payload,itb_api_key)
          test_results = get_curl_report_request(sessions,itb_api_key,report_api_endpoint)
+         result_percentage = calculate_percentage_not_equal(test_results, 'SUCESS')
+         test_result.info({'test endpoint': os.getenv(json.loads(start_payload)["system"]), 'test result': str(100-result_percentage) + " percent conformity"})
          print(test_results)
-         test_description, result = next(iter(test_results.items()))
-         info_1.info({'test session': sessions[0], 'test description':test_description, 'test result': result})
