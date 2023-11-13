@@ -1,3 +1,5 @@
+import time
+
 import requests
 from prometheus_client import start_http_server, Gauge,Info
 import json
@@ -36,15 +38,23 @@ def calculate_percentage_not_equal(dictionary, target_value):
 
 #Interaction with ITB
 #function to send start request to ITB for a specific test sessionn and return the session ids
-def send_curl_start_request(start_api_endpoint, start_payload, itb_api_key):
+def send_curl_start_request(start_api_endpoint, start_system,itb_api_key):
     url = start_api_endpoint
-    payload =start_payload
+    payload = json.dumps({
+              "system": "CF4AFE0FX7412X4410X83FCX78171EF71A1D",
+              "actor": "74EC1E15XDDFFX4BABXA3C6X60E9B06403A9",
+              "testCase": [
+                "ts1_tc8",
+                "ts1_tc9"
+              ]
+            })
     headers = {
         'ITB_API_KEY': itb_api_key,
         'Content-Type': 'text/plain'
     }
     response = requests.request("POST", url, headers=headers, data=payload)
-    logging.info("Sending start request to: " + url + "\n with payload" + payload)
+    logging.info("Sending start request to: " + url + "\n with payload: " + payload)
+    #print(response.json())
     return (extract_values_by_key(response.json(),'session'))
 
 
@@ -79,16 +89,22 @@ if __name__ == '__main__':
     #load configurable parameters
     load_dotenv()
     start_api_endpoint = os.getenv("START_API_ENDPOINT")
-    start_payload= os.getenv("START_PAYLOAD")
+    start_systems= os.getenv("START_SYSTEM").split(',')
     itb_api_key = os.getenv("ITB_API_KEY")
     debug_level =os.getenv("DEBUG_LEVEL")
     report_api_endpoint = os.getenv("REPORT_API_ENDPOINT")
     logging.basicConfig(level=debug_level)
 
-    test_result = Info('test_results_info_1', 'The results of test')
+    #Create Info objects based on the number of start systems
+    test_prothemuese_results = [Info(f"results_{i + 1}", f"Description_test_results{i + 1}") for i in range(len(start_systems))]
+    index = 0
     while True:
-         sessions = send_curl_start_request(start_api_endpoint,start_payload,itb_api_key)
-         test_results = get_curl_report_request(sessions,itb_api_key,report_api_endpoint)
-         result_percentage = calculate_percentage_not_equal(test_results, 'SUCESS')
-         test_result.info({'test endpoint': os.getenv(json.loads(start_payload)["system"]), 'test result': str(100-result_percentage) + " percent conformity"})
-         print(test_results)
+         for start_system in start_systems:
+             sessions = send_curl_start_request(start_api_endpoint,start_system,itb_api_key)
+             test_results = get_curl_report_request(sessions,itb_api_key,report_api_endpoint)
+             result_percentage = calculate_percentage_not_equal(test_results, 'SUCCESS')
+             test_prothemuese_results[index].info({os.getenv(start_system):str(100-result_percentage) + " percent conformity"})
+             #print({os.getenv(start_system):str(100-result_percentage) + " percent conformity"})
+             index = index + 1
+         time.sleep(50)
+         index = 0
