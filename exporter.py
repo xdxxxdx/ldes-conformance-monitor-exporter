@@ -90,7 +90,7 @@ def get_curl_report_request(sessions,itb_api_key,report_api_endpoint):
         while (response.status_code != 200) or ET.fromstring(response.text).find(
                 '{http://www.gitb.com/tr/v1/}result').text == "UNDEFINED":
             response = requests.request("GET", url, headers=headers, data=payload)
-        test_descripton = ET.fromstring(response.text).find('.//ns2:description', namespaces=namespace).text
+        test_descripton = ET.fromstring(response.text).find('.//ns2:name', namespaces=namespace).text
         result = ET.fromstring(response.text).find(
                 '{http://www.gitb.com/tr/v1/}result').text
 
@@ -112,10 +112,9 @@ if __name__ == '__main__':
     #todo: Define how to reflect results to Prometheuse.
     #todo: Which testcases we are looking for from the ITB?
     info_1 = Info('test_results_info_1', 'The results of test')
-    info_2 = Info('test_results_info_2', 'The results of test')
     while True:
          sessions = send_curl_start_request(start_api_endpoint,start_payload,itb_api_key)
          test_results = get_curl_report_request(sessions,itb_api_key,report_api_endpoint)
+         print(test_results)
          test_description, result = next(iter(test_results.items()))
          info_1.info({'test session': sessions[0], 'test description':test_description, 'test result': result})
-         info_2.info({'test session': sessions[1], 'test description': test_description, 'test result': result})
