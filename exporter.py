@@ -1,5 +1,5 @@
 import requests
-from prometheus_client import start_http_server, Gauge
+from prometheus_client import start_http_server, Gauge,Info
 import time
 import xml.etree.ElementTree as ET
 import os
@@ -75,7 +75,8 @@ def send_curl_start_request(start_api_endpoint, start_payload, itb_api_key):
 
 #function to get report request from ITB for a specific test session
 def get_curl_report_request(sessions,itb_api_key,report_api_endpoint):
-    results = []
+    results = {}
+    namespace = {'ns2': 'http://www.gitb.com/core/v1/'}
     for session in sessions:
         url = report_api_endpoint + session
         logging.info("Getting report for: " + url)
@@ -89,14 +90,15 @@ def get_curl_report_request(sessions,itb_api_key,report_api_endpoint):
         while (response.status_code != 200) or ET.fromstring(response.text).find(
                 '{http://www.gitb.com/tr/v1/}result').text == "UNDEFINED":
             response = requests.request("GET", url, headers=headers, data=payload)
+        test_descripton = ET.fromstring(response.text).find('.//ns2:description', namespaces=namespace).text
         result = ET.fromstring(response.text).find(
                 '{http://www.gitb.com/tr/v1/}result').text
-        logging.info("result for "+ session +"is: " + result )
-        results.append(result)
+
+        results[test_descripton] = ET.fromstring(response.text).find('{http://www.gitb.com/tr/v1/}result').text
+        logging.info("result for "+ test_descripton  +"is: " + result )
     return results
 
 if __name__ == '__main__':
-    example_metric = Gauge('test_result', 'Description of test result')
     start_http_server(8000)
     #load configurable parameters
     load_dotenv()
@@ -108,10 +110,12 @@ if __name__ == '__main__':
     logging.basicConfig(level=debug_level)
 
     #todo: Define how to reflect results to Prometheuse.
+    #todo: Which testcases we are looking for from the ITB?
+    info_1 = Info('test_results_info_1', 'The results of test')
+    info_2 = Info('test_results_info_2', 'The results of test')
     while True:
-         # Simulate updating a metric value (replace this with your actual metric logic
-         if  'FAILURE' in get_curl_report_request(send_curl_start_request(start_api_endpoint,start_payload,itb_api_key),itb_api_key,report_api_endpoint):
-             example_metric.set(0)
-         else:
-             example_metric.set(1)
-         time.sleep(1)
+         sessions = send_curl_start_request(start_api_endpoint,start_payload,itb_api_key)
+         test_results = get_curl_report_request(sessions,itb_api_key,report_api_endpoint)
+         test_description, result = next(iter(test_results.items()))
+         info_1.info({'test session': sessions[0], 'test description':test_description, 'test result': result})
+         info_2.info({'test session': sessions[1], 'test description': test_description, 'test result': result})
