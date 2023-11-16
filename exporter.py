@@ -39,11 +39,11 @@ def calculate_percentage_not_equal(dictionary, target_value):
 
 # Interaction with ITB
 # function to send start request to ITB for a specific test sessionn and return the session ids
-def send_curl_start_request(start_api_endpoint, start_system, itb_api_key):
+def send_curl_start_request(start_api_endpoint, start_system, itb_api_key, actor_key):
     url = start_api_endpoint
     payload = json.dumps({
         "system": start_system,
-        "actor": "74EC1E15XDDFFX4BABXA3C6X60E9B06403A9",
+        "actor": actor_key,
         "testCase": [
             "ts1_tc8",
             "ts1_tc9"
@@ -94,6 +94,7 @@ def conformance_monitor():
     start_api_endpoint = os.getenv("START_API_ENDPOINT")
     start_systems = os.getenv("START_SYSTEM").split(',')
     itb_api_key = os.getenv("ITB_API_KEY")
+    actor_key = os.getenv("ACTOR_API_KEY")
     debug_level = os.getenv("DEBUG_LEVEL")
     report_api_endpoint = os.getenv("REPORT_API_ENDPOINT")
     logging.basicConfig(level=debug_level)
@@ -104,7 +105,7 @@ def conformance_monitor():
     index = 0
     while True:
         for start_system in start_systems:
-            sessions = send_curl_start_request(start_api_endpoint, start_system, itb_api_key)
+            sessions = send_curl_start_request(start_api_endpoint, start_system, itb_api_key, actor_key)
             test_results = get_curl_report_request(sessions, itb_api_key, report_api_endpoint)
             result_percentage = calculate_percentage_not_equal(test_results, 'SUCCESS')
             test_prothemuese_results[index].info(
