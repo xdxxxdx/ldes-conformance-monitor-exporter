@@ -44,9 +44,8 @@ def send_curl_start_request(start_api_endpoint, start_system, itb_api_key, actor
     payload = json.dumps({
         "system": start_system,
         "actor": actor_key,
-        "testCase": [
-            "ts1_tc8",
-            "ts1_tc9"
+        "testSuite": [
+            "ts1"
         ]
     })
     headers = {
