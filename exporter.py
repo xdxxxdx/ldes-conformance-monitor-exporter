@@ -60,7 +60,6 @@ def send_curl_start_request(start_api_endpoint, start_system, itb_api_key, actor
 # function to get report request from ITB for a specific test session
 def get_curl_report_request(sessions, itb_api_key, status_api_endpoint):
     results = {}
-    namespace = {'ns2': 'http://www.gitb.com/core/v1/'}
     for session in sessions:
         url = status_api_endpoint
         logging.info("Getting status for: " + url + " Session:" + session)
